@@ -1,0 +1,221 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  name         String?
+  avatar       String?
+  passwordHash String?
+  eloRating    Int       @default(800)
+  currentLevel Int       @default(1)
+  streak       Int       @default(0)
+  lastStudied  DateTime?
+  totalXp      Int       @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  lessons       LessonProgress[]
+  puzzles       PuzzleAttempt[]
+  games         Game[]
+  conversations Conversation[]
+  badges        UserBadge[]
+  openingBook   OpeningBookEntry[]
+
+  @@index([email])
+  @@index([eloRating])
+}
+
+model Module {
+  id            String   @id
+  level         Int
+  title         String
+  description   String   @db.Text
+  content       Json     // Rich text + board positions
+  order         Int
+  xpReward      Int      @default(100)
+  prerequisites String[]
+
+  // Relations
+  progress LessonProgress[]
+
+  @@index([level])
+  @@index([order])
+}
+
+model LessonProgress {
+  id          String    @id @default(cuid())
+  userId      String
+  moduleId    String
+  completed   Boolean   @default(false)
+  quizScore   Int?
+  completedAt DateTime?
+  timeSpent   Int       @default(0) // seconds
+
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  module Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleId])
+  @@index([userId])
+  @@index([moduleId])
+}
+
+model PuzzleAttempt {
+  id          String   @id @default(cuid())
+  userId      String
+  puzzleId    String   // Lichess puzzle ID
+  correct     Boolean
+  hintsUsed   Int      @default(0)
+  timeMs      Int
+  theme       String
+  rating      Int
+  attemptedAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([puzzleId])
+  @@index([theme])
+  @@index([attemptedAt])
+}
+
+model Game {
+  id           String   @id @default(cuid())
+  userId       String
+  pgn          String   @db.Text
+  fen          String?  // Final position
+  result       String   // win/loss/draw
+  color        String   // white/black
+  opponentType String   // ai/human
+  aiLevel      Int?
+  eloChange    Int?
+  analysis     Json?    // AI analysis result
+  playedAt     DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([playedAt])
+  @@index([result])
+}
+
+model Conversation {
+  id        String    @id @default(cuid())
+  userId    String
+  title     String    @default("New Chat")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId])
+  @@index([updatedAt])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String   // user/assistant
+  content        String   @db.Text
+  provider       String?  // gemini/claude/gpt4o/grok
+  fen            String?  // Attached board position
+  createdAt      DateTime @default(now())
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+model Badge {
+  id          String @id
+  name        String
+  description String
+  icon        String
+  condition   Json   // Badge condition as JSON
+  category    String @default("achievement") // achievement/milestone/streak/skill
+
+  // Relations
+  users UserBadge[]
+
+  @@index([category])
+}
+
+model UserBadge {
+  id       String   @id @default(cuid())
+  userId   String
+  badgeId  String
+  earnedAt DateTime @default(now())
+
+  // Relations
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@index([badgeId])
+}
+
+model OpeningBookEntry {
+  id      String   @id @default(cuid())
+  userId  String
+  eco     String   // ECO code (e.g., "B90")
+  name    String
+  pgn     String   @db.Text
+  notes   String?  @db.Text
+  addedAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eco])
+}
+
+// Cache table for Lichess puzzles
+model CachedPuzzle {
+  id         String   @id // Lichess puzzle ID
+  fen        String
+  moves      String[] // Solution moves in UCI format
+  rating     Int
+  themes     String[]
+  gameUrl    String?
+  fetchedAt  DateTime @default(now())
+
+  @@index([rating])
+  @@index([themes])
+}
+
+// Daily stats for analytics
+model DailyStats {
+  id              String   @id @default(cuid())
+  userId          String
+  date            DateTime @db.Date
+  puzzlesSolved   Int      @default(0)
+  puzzlesCorrect  Int      @default(0)
+  gamesPlayed     Int      @default(0)
+  gamesWon        Int      @default(0)
+  lessonsCompleted Int     @default(0)
+  studyTimeMinutes Int     @default(0)
+  xpEarned        Int      @default(0)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@index([date])
+}

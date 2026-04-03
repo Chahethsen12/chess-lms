@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "cd ../.. && pnpm turbo build --filter=@chess-lms/web",
+  "installCommand": "cd ../.. && pnpm install",
+  "outputDirectory": "dist"
+}

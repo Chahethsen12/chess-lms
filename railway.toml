@@ -1,0 +1,11 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd apps/api && npm install && npx prisma generate && npm run build"
+
+[deploy]
+startCommand = "cd apps/api && npm start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 100
+
+[env]
+NODE_ENV = "production"
